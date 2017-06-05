@@ -1,0 +1,24 @@
+﻿@model NavigationItem
+@{
+    List<NavigationItem> mainNavigationItems = Model.ChildNavigationItems.Where(ni => ni.AppearsIn.Any(mco => mco.Codename == "main_menu")).ToList();
+}
+
+@if (Model.ChildNavigationItems == null || !Model.ChildNavigationItems.Any())
+{
+    <li><a class="drawer-menu-item" href="@Model.UrlPath">@Html.DisplayFor(vm => vm.System.Name)</a></li>
+}
+else
+{
+    <li class="drawer-dropdown">
+        <a class="drawer-menu-item" href="#" data-toggle="dropdown" role="button" aria-expanded="false">
+            @Html.DisplayFor(vm => vm.System.Name)
+            <span class="drawer-caret" />
+        </a>
+        <ul class="drawer-dropdown-menu">
+            @foreach (var item in mainNavigationItems)
+            {
+                @Html.DisplayFor(vm => item, "NavigationItemMain-2")
+            }
+        </ul>
+    </li>
+}

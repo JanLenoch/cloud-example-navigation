@@ -1,0 +1,12 @@
+﻿@model Home
+
+<div class="row marketing">
+    <h2>Articles from the Dancing Goat Sample Site</h2>
+</div>
+<div class="row marketing">
+    @*
+        This MVC helper method ensures that current model is rendered
+        with suitable view from /Views/Shared/DisplayTemplates
+    *@
+    @Html.DisplayFor(vm => vm.Articles)
+</div>

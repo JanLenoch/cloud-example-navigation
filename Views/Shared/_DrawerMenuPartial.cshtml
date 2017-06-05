@@ -1,0 +1,24 @@
+﻿@model NavigationItem
+@{
+    List<NavigationItem> mainNavigationItems = Model.ChildNavigationItems.Where(ni => ni.AppearsIn.Any(mco => mco.Codename == "main_menu")).ToList();
+}
+
+<header class="drawer-navbar drawer-navbar--fixed" role="banner">
+    <div class="drawer-container">
+        <div class="drawer-navbar-header">
+            <a class="drawer-brand" href="#">Dancing Goat</a>
+            <button type="button" class="drawer-toggle drawer-hamburger">
+                <span class="sr-only">toggle navigation</span>
+                <span class="drawer-hamburger-icon"></span>
+            </button>
+        </div>
+        <nav class="drawer-nav" role="navigation">
+            <ul class="drawer-menu ">
+                @foreach (var item in mainNavigationItems)
+                {
+                    @Html.DisplayFor(vm => item, "NavigationItemMain-1")
+                }
+            </ul>
+        </nav>
+    </div>
+</header>

@@ -1,0 +1,8 @@
+﻿@model PageViewModel
+
+@section Navigation
+{
+    @Html.Partial("_DrawerMenuPartial", Model.Navigation)
+}
+
+@Html.DisplayFor(vm => vm.Body)
