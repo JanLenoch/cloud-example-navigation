@@ -7,14 +7,17 @@ using KenticoCloud.Delivery;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Http;
 
-namespace NavigationMenusMvc.Services
+namespace NavigationMenusMvc.Helpers
 {
     public static class NavigationProvider
     {
+        private const string ITEM_TYPE = "navigation_item";
+        private const string NAVIGATION_CACHE_KEY = "navigationWithUrlPaths";
+
         public async static Task<NavigationItem> GetNavigationItemsAsync(IDeliveryClient client, string navigationCodeName, int depth)
         {
             var response = await client.GetItemsAsync<object>(
-                new EqualsFilter("system.type", "navigation_item"),
+                new EqualsFilter("system.type", ITEM_TYPE),
                 new EqualsFilter("system.codename", navigationCodeName),
                 new LimitParameter(1),
                 new DepthParameter(depth)
@@ -25,7 +28,7 @@ namespace NavigationMenusMvc.Services
 
         public static async Task<NavigationItem> GetOrCreateCachedNavigationAsync(string navigationCodeName, int depth, IDeliveryClient client, IMemoryCache cache, int cacheExpirationMinutes, string rootToken, string homepageToken)
         {
-            return await cache.GetOrCreate("navigationWithUrlPaths", async entry =>
+            return await cache.GetOrCreate(NAVIGATION_CACHE_KEY, async entry =>
             {
                 var navigation = await GetNavigationItemsAsync(client, navigationCodeName, depth);
 
@@ -59,21 +62,6 @@ namespace NavigationMenusMvc.Services
                 parentItems.Add(navigation);
                 Parallel.ForEach(navigation.ChildNavigationItems, currentChild => AddUrlPaths(currentChild, navigation.UrlPath, parentItems, rootToken, homepageToken));
             }
-        }
-
-        public static string GetRelativeUrlPath(HttpContext context, string originalRelativeUrl)
-        {
-            string[] urlSlugs = GetUrlSlugs(context.Request.Path);
-            string returnUrl = null;
-
-            for (int i = 0; i < urlSlugs.Count() - 2; i++)
-            {
-                returnUrl += "../";
-            }
-
-            returnUrl += originalRelativeUrl;
-
-            return returnUrl;
         }
 
         public static string[] GetUrlSlugs(string urlPath)

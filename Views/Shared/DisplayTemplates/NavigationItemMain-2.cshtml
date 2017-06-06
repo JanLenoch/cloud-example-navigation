@@ -1,6 +1,3 @@
 ﻿@model NavigationItem
-@{ 
-    string urlPath = NavigationMenusMvc.Services.NavigationProvider.GetRelativeUrlPath(Context, Model.UrlPath);
-}
 
-<li><a class="drawer-dropdown-menu-item" href="@urlPath">@Html.DisplayFor(vm => vm.System.Name)</a></li>
+<li><a class="drawer-dropdown-menu-item" href="/@Model.UrlPath">@Html.DisplayFor(vm => vm.System.Name)</a></li>

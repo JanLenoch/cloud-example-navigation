@@ -91,7 +91,7 @@ namespace NavigationMenusMvc
                 routes.MapRoute(
                     name: "kenticoCloudRouting",
                     template: "{*urlPath}",
-                    defaults: new { controller = "KenticoCloud", action = "Route" });
+                    defaults: new { controller = "KenticoCloud", action = "ResolveContent" });
 
                 routes.MapRoute(
                     name: "default",

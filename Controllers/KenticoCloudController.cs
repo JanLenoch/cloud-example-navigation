@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using KenticoCloud.Delivery;
 using NavigationMenusMvc.Models;
-using NavigationMenusMvc.Services;
+using NavigationMenusMvc.Helpers;
 using Microsoft.Extensions.Caching.Memory;
 using System.Reflection;
 
@@ -19,100 +19,34 @@ namespace NavigationMenusMvc.Controllers
         private const int NAVIGATION_CACHE_EXPIRATION_MINUTES = 15;
         private const string ROOT_TOKEN = "[root]";
         private const string HOMEPAGE_TOKEN = "[home]";
+        private const string DEFAULT_VIEW = "Default";
 
         public KenticoCloudController(IDeliveryClient deliveryClient, IMemoryCache memoryCache) : base(deliveryClient, memoryCache)
         {
 
         }
 
-        public async Task<ActionResult> Route(string urlPath)
+        public async Task<ActionResult> ResolveContent(string urlPath)
         {
-            // Get the 'Navigation' item with depth=deepest menu in the app.
-            //var navigationItem = await NavigationProvider.GetNavigationItems(_deliveryClient, "navigation", MAX_LEVEL_DEPTH);
-            var navigationItem = await NavigationProvider.GetOrCreateCachedNavigationAsync(NAVIGATION_CODE_NAME, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN);
-
-            // Strip the trailing slash and split.
-            string[] urlSlugs = NavigationProvider.GetUrlSlugs(urlPath);
-
-            // Recursively iterate over modular content and match the URL slugs for the each recursion level.
-            try
-            {
-                return await ProcessRouteLevelAsync(urlSlugs, navigationItem, BASE_LEVEL, navigationItem.ViewName, navigationItem);
-            }
-            catch (Exception ex)
-            {
-                return Content($"There was an error while resolving the URL. Check if your URL was correct and try again. Details: {ex.Message}");
-            }
+            return await UrlResolver.ResolveRelativeUrlPath(urlPath, NAVIGATION_CODE_NAME, BASE_LEVEL, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN, ResolveContentAsync);
         }
 
-        private async Task<ActionResult> ProcessRouteLevelAsync(string[] urlSlugs, NavigationItem currentLevelItem, int level, string viewName, NavigationItem rootItem)
-        {
-            if (urlSlugs == null)
-            {
-                throw new ArgumentNullException(nameof(urlSlugs));
-            }
-
-            if (!urlSlugs.Any())
-            {
-                throw new ArgumentOutOfRangeException(nameof(urlSlugs));
-            }
-
-            if (currentLevelItem == null)
-            {
-                throw new ArgumentNullException(nameof(currentLevelItem));
-            }
-
-            if (level < BASE_LEVEL)
-            {
-                throw new ArgumentOutOfRangeException(nameof(level), "The 'level' must be greater or equal to zero.");
-            }
-
-            // No need to replace with ROOT_TOKEN, we're checking the incoming URL.
-            string currentSlug = urlSlugs[level] == string.Empty ? HOMEPAGE_TOKEN : urlSlugs[level];
-
-            NavigationItem matchingChild = currentLevelItem.ChildNavigationItems.FirstOrDefault(i => i.UrlSlug == currentSlug);
-            bool endOfPath = level == urlSlugs.Count() - 1;
-
-            if (matchingChild != null)
-            {
-                // Set a new inherited view name for lower nodes in the hierarchy.
-                if (!string.IsNullOrEmpty(matchingChild.ViewName))
-                {
-                    viewName = matchingChild.ViewName;
-                }
-
-                if (endOfPath)
-                {
-                    return await ResolveContentAsync(matchingChild, matchingChild, viewName, false, rootItem);
-                }
-                else
-                {
-                    int newLevel = level + 1;
-
-                    // Dig through the incoming URL.
-                    return await ProcessRouteLevelAsync(urlSlugs, matchingChild, newLevel, viewName, rootItem);
-                }
-            }
-            else
-            {
-                return new NotFoundResult();
-            }
-        }
-
-        private async Task<ActionResult> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, string viewName, bool redirected, NavigationItem rootItem)
+        private async Task<ActionResult> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, string viewName, bool redirected)
         {
             if (currentItem.ContentItems != null && currentItem.ContentItems.Any())
             {
                 if (redirected)
                 {
+                    var cachedNavigation = await NavigationProvider.GetOrCreateCachedNavigationAsync(NAVIGATION_CODE_NAME, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN);
+                    
                     // Get complete URL and return 301. No direct rendering (not SEO-friendly).
-                    string urlPath = await LocateFirstOccurrenceInTreeAsync(rootItem, currentItem);
+                    string urlPath = await LocateFirstOccurrenceInTreeAsync(cachedNavigation, currentItem);
 
                     return LocalRedirectPermanent($"/{urlPath}");
                 }
                 else
                 {
-                    return await RenderViewAsync(viewName, currentItem.ContentItems, rootItem);
+                    return await RenderViewAsync(viewName, currentItem.ContentItems);
                 }
             }
             else if (currentItem.Redirect != null && currentItem.Redirect.Any())
@@ -122,7 +56,7 @@ namespace NavigationMenusMvc.Controllers
                 // Check for infinite loops.
                 if (!redirectItem.Equals(originalItem))
                 {
-                    return await ResolveContentAsync(originalItem, redirectItem, viewName, true, rootItem);
+                    return await ResolveContentAsync(originalItem, redirectItem, viewName, true);
                 }
                 else
                 {
@@ -138,6 +72,11 @@ namespace NavigationMenusMvc.Controllers
 
         private async Task<string> LocateFirstOccurrenceInTreeAsync(NavigationItem cachedNavigation, NavigationItem itemToLocate)
         {
+            if (cachedNavigation.UrlPath == null)
+            {
+                throw new ArgumentException($"The {nameof(cachedNavigation.UrlPath)} property cannot be null.", nameof(cachedNavigation.UrlPath));
+            }
+
             var match = cachedNavigation.ChildNavigationItems.FirstOrDefault(i => i.System.Codename == itemToLocate.System.Codename);
 
             if (match != null)
@@ -158,17 +97,22 @@ namespace NavigationMenusMvc.Controllers
             }
         }
 
-        private async Task<ViewResult> RenderViewAsync(string viewName, IEnumerable<object> contentItems, NavigationItem navigation)
+        private async Task<ViewResult> RenderViewAsync(string viewName, IEnumerable<object> contentItems)
         {
-            var bodyResponse = await _deliveryClient.GetItemsAsync<object>(GetContentItemCodenameFilter(contentItems));
+            var navigationItemTask = NavigationProvider.GetOrCreateCachedNavigationAsync(NAVIGATION_CODE_NAME, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN);
+
+            // Separate request for real content. Separate caching, separate depth of modular content.
+            var bodyResponseTask = _deliveryClient.GetItemsAsync<object>(GetContentItemCodenameFilter(contentItems));
+
+            await Task.WhenAll(navigationItemTask, bodyResponseTask);
 
             var pageViewModel = new PageViewModel
             {
-                Navigation = navigation,
-                Body = bodyResponse.Items
+                Navigation = navigationItemTask.Result,
+                Body = bodyResponseTask.Result.Items
             };
 
-            return View(viewName, pageViewModel);
+            return View((string.IsNullOrEmpty(viewName) ? DEFAULT_VIEW : viewName), pageViewModel);
         }
 
         private InFilter GetContentItemCodenameFilter(IEnumerable<object> items)
