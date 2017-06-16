@@ -21,88 +21,59 @@ namespace NavigationMenusMvc.Controllers
         private const string HOMEPAGE_TOKEN = "[home]";
         private const string DEFAULT_VIEW = "Default";
 
-        public KenticoCloudController(IDeliveryClient deliveryClient, IMemoryCache memoryCache) : base(deliveryClient, memoryCache)
-        {
+        protected readonly INavigationProvider _navigationProvider;
+        private readonly IContentResolver _contentResolver;
 
+        public KenticoCloudController(IDeliveryClient deliveryClient, IMemoryCache memoryCache, INavigationProvider navigationProvider, IContentResolver contentResolver) : base(deliveryClient, memoryCache)
+        {
+            _navigationProvider = navigationProvider ?? throw new ArgumentNullException(nameof(navigationProvider));
+            _contentResolver = contentResolver ?? throw new ArgumentNullException(nameof(contentResolver));
         }
 
-        public async Task<ActionResult> ResolveContent(string urlPath)
+        public async Task<ActionResult> Index(string urlPath)
         {
-            return await UrlResolver.ResolveRelativeUrlPath(urlPath, NAVIGATION_CODE_NAME, BASE_LEVEL, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN, ResolveContentAsync);
-        }
+            IContentResolverResults results;
 
-        private async Task<ActionResult> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, string viewName, bool redirected)
-        {
-            if (currentItem.ContentItems != null && currentItem.ContentItems.Any())
+            try
             {
-                if (redirected)
+                results = await _contentResolver.ResolveRelativeUrlPath(urlPath);
+            }
+            catch (Exception ex)
+            {
+                return new ContentResult
                 {
-                    var cachedNavigation = await NavigationProvider.GetOrCreateCachedNavigationAsync(NAVIGATION_CODE_NAME, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN);
-                    
-                    // Get complete URL and return 301. No direct rendering (not SEO-friendly).
-                    string urlPath = await LocateFirstOccurrenceInTreeAsync(cachedNavigation, currentItem);
+                    Content = $"There was an error while resolving the URL. Check if your URL was correct and try again. Details: {ex.Message}",
+                    StatusCode = 500
+                };
+            }
 
-                    return LocalRedirectPermanent($"/{urlPath}");
-                }
-                else
+            if (results.Found)
+            {
+                if (results.ContentItemCodenames != null && results.ContentItemCodenames.Any())
                 {
-                    return await RenderViewAsync(viewName, currentItem.ContentItems);
+                    return await RenderViewAsync(results.ContentItemCodenames, results.ViewName);
+                }
+                else if (!string.IsNullOrEmpty(results.RedirectUrl))
+                {
+                    return LocalRedirectPermanent($"/{results.RedirectUrl}");
                 }
             }
-            else if (currentItem.Redirect != null && currentItem.Redirect.Any())
+            else if (!string.IsNullOrEmpty(results.RedirectUrl))
             {
-                var redirectItem = currentItem.Redirect.FirstOrDefault();
-
-                // Check for infinite loops.
-                if (!redirectItem.Equals(originalItem))
-                {
-                    return await ResolveContentAsync(originalItem, redirectItem, viewName, true);
-                }
-                else
-                {
-                    // Non-invasive solution.
-                    return new NotFoundResult();
-                }
+                return RedirectPermanent(results.RedirectUrl);
             }
             else
             {
-                return new NotFoundResult();
+                return NotFound();
             }
         }
 
-        private async Task<string> LocateFirstOccurrenceInTreeAsync(NavigationItem cachedNavigation, NavigationItem itemToLocate)
+        private async Task<ViewResult> RenderViewAsync(IEnumerable<string> codenames, string viewName)
         {
-            if (cachedNavigation.UrlPath == null)
-            {
-                throw new ArgumentException($"The {nameof(cachedNavigation.UrlPath)} property cannot be null.", nameof(cachedNavigation.UrlPath));
-            }
+            var navigationItemTask = _navigationProvider.GetOrCreateCachedNavigationAsync();
 
-            var match = cachedNavigation.ChildNavigationItems.FirstOrDefault(i => i.System.Codename == itemToLocate.System.Codename);
-
-            if (match != null)
-            {
-                return match.UrlPath;
-            }
-            else
-            {
-                var results = new List<string>();
-
-                foreach (var childItem in cachedNavigation.ChildNavigationItems)
-                {
-                    results.Add(await LocateFirstOccurrenceInTreeAsync(childItem, itemToLocate));
-                }
-                
-                // No heuristics here, just the first occurrence.
-                return results.FirstOrDefault(r => !string.IsNullOrEmpty(r));
-            }
-        }
-
-        private async Task<ViewResult> RenderViewAsync(string viewName, IEnumerable<object> contentItems)
-        {
-            var navigationItemTask = NavigationProvider.GetOrCreateCachedNavigationAsync(NAVIGATION_CODE_NAME, MAX_LEVEL_DEPTH, _deliveryClient, _cache, NAVIGATION_CACHE_EXPIRATION_MINUTES, ROOT_TOKEN, HOMEPAGE_TOKEN);
-
-            // Separate request for real content. Separate caching, separate depth of modular content.
-            var bodyResponseTask = _deliveryClient.GetItemsAsync<object>(GetContentItemCodenameFilter(contentItems));
+            // Separate request for page body content. Separate caching, separate depth of modular content.
+            var bodyResponseTask = _deliveryClient.GetItemsAsync<object>(new InFilter("system.codename", codenames.ToArray()));
 
             await Task.WhenAll(navigationItemTask, bodyResponseTask);
 
@@ -113,19 +84,6 @@ namespace NavigationMenusMvc.Controllers
             };
 
             return View((string.IsNullOrEmpty(viewName) ? DEFAULT_VIEW : viewName), pageViewModel);
-        }
-
-        private InFilter GetContentItemCodenameFilter(IEnumerable<object> items)
-        {
-            var filterValues = new List<string>();
-
-            foreach (var item in items)
-            {
-                ContentItemSystemAttributes system = item.GetType().GetTypeInfo().GetProperty("System", typeof(ContentItemSystemAttributes)).GetValue(item) as ContentItemSystemAttributes;
-                filterValues.Add(system.Codename);
-            }
-
-            return new InFilter("system.codename", filterValues.ToArray());
         }
     }
 }

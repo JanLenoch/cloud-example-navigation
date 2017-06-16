@@ -1,4 +1,5 @@
-﻿using KenticoCloud.Delivery;
+﻿using System;
+using KenticoCloud.Delivery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -11,8 +12,8 @@ namespace NavigationMenusMvc.Controllers
 
         public BaseController(IDeliveryClient deliveryClient, IMemoryCache memoryCache)
         {
-            _deliveryClient = deliveryClient;
-            _cache = memoryCache;
+            _deliveryClient = deliveryClient ?? throw new ArgumentNullException(nameof(deliveryClient));
+            _cache = memoryCache ?? throw new ArgumentNullException(nameof(memoryCache));
         }
     }
 }
