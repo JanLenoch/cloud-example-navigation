@@ -1,52 +1,53 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using KenticoCloud.Delivery;
+﻿using KenticoCloud.Delivery;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading.Tasks;
-using SimpleMvcSitemap;
 using Microsoft.Extensions.Caching.Memory;
+using NavigationMenusMvc.Helpers;
+using NavigationMenusMvc.Models;
+using SimpleMvcSitemap;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace NavigationMenusMvc.Controllers
 {
     public class SiteMapController : BaseController
     {
-        public SiteMapController(IDeliveryClient deliveryClient, IMemoryCache memoryCache): base(deliveryClient, memoryCache)
+        private readonly INavigationProvider _navigationProvider;
+
+        public SiteMapController(IDeliveryClient deliveryClient, IMemoryCache memoryCache, INavigationProvider navigationProvider) : base(deliveryClient, memoryCache)
         {
+            _navigationProvider = navigationProvider ?? throw new ArgumentNullException(nameof(navigationProvider));
         }
 
         public async Task<ActionResult> Index()
         {
-            // TODO: The different system types which should be included in the sitemap should be specified in the InFilter params
-            var parameters = new List<IQueryParameter>
+            var navigation = await _navigationProvider.GetOrCreateCachedNavigationAsync();
+            var flatNavigation = NavigationProvider.GetNavigationItemsFlat(navigation).ToList();
+            Dictionary<NavigationItem, List<string>> codenames = new Dictionary<NavigationItem, List<string>>();
+
+            foreach (var item in flatNavigation)
             {
-                new DepthParameter(0),
-                new InFilter("system.type", "article", "cafe"),
-            };
-
-            var response = await _deliveryClient.GetItemsAsync(parameters);
-
-            var nodes = response.Items.Select(item => new SitemapNode(GetPageUrl(item.System))
-                {
-                    LastModificationDate = item.System.LastModified
-                })
-                .ToList();
-
-            return new SitemapProvider().CreateSitemap(new SitemapModel(nodes));
-        }
-
-        private static string GetPageUrl(ContentItemSystemAttributes system)
-        {
-            // TODO: The URL generation logic should be adjusted to match your website
-            var url = string.Empty;
-
-            if(system.SitemapLocation.Any())
-            {
-                url = $"/{system.SitemapLocation[0]}";
+                codenames.Add(item, ContentResolver.GetContentItemCodenames(item.ContentItems).ToList());
             }
 
-            url = $"{url}/{system.Codename.Replace("_", "-").TrimEnd('-')}";
+            var response = await _deliveryClient.GetItemsAsync(new InFilter("system.codename", codenames.SelectMany(ni => ni.Value).ToArray()));
+            var nodes = new List<SitemapNode>();
 
-            return url;
+            foreach (var item in codenames)
+            {
+                var lastModifiedContentItem = response.Items.Where(ci => item.Value.Contains(ci.System.Codename)).OrderByDescending(ci => ci.System.LastModified).FirstOrDefault();
+
+                if (lastModifiedContentItem != null)
+                {
+                    nodes.Add(new SitemapNode(item.Key.UrlPath)
+                    {
+                        LastModificationDate = lastModifiedContentItem.System.LastModified
+                    }); 
+                }
+            }
+
+            return new SitemapProvider().CreateSitemap(new SitemapModel(nodes));
         }
     }
 }

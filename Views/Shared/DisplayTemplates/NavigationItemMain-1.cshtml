@@ -5,13 +5,13 @@
 
 @if (Model.ChildNavigationItems == null || !Model.ChildNavigationItems.Any())
 {
-    <li><a class="drawer-menu-item" href="/@Model.UrlPath">@Html.DisplayFor(vm => vm.System.Name)</a></li>
+    <li><a class="drawer-menu-item" href="/@Model.UrlPath">@Html.DisplayFor(vm => vm.Title)</a></li>
 }
 else
 {
     <li class="drawer-dropdown">
         <a class="drawer-menu-item" href="/@Model.UrlPath" data-toggle="dropdown" role="button" aria-expanded="false">
-            @Html.DisplayFor(vm => vm.System.Name)
+            @Html.DisplayFor(vm => vm.Title)
             <span class="drawer-caret" />
         </a>
         <ul class="drawer-dropdown-menu">

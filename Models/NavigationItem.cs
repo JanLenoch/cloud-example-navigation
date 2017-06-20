@@ -1,6 +1,5 @@
-﻿using System;
+﻿using KenticoCloud.Delivery;
 using System.Collections.Generic;
-using KenticoCloud.Delivery;
 
 namespace NavigationMenusMvc.Models
 {
@@ -8,24 +7,26 @@ namespace NavigationMenusMvc.Models
     public class NavigationItem
     {
         public const string Codename = "navigation_item";
+        public const string TitleCodename = "title";
         public const string ContentItemsCodename = "content_items";
-        public const string LocalRedirectCodename = "local_redirect";
+        public const string RedirectToItemCodename = "local_redirect";
         public const string AppearsInCodename = "appears_in";
         public const string ChildNavigationItemsCodename = "child_navigation_items";
-        public const string OtherRedirectCodename = "other_redirect";
+        public const string RedirectToUrlCodename = "other_redirect";
         public const string UrlSlugCodename = "url_slug";
         public const string ViewNameCodename = "view_name";
 
+        public string Title { get; set; }
         public IEnumerable<object> ContentItems { get; set; }
 
-        // Changed from IEnumerable<object>.
-        public IEnumerable<NavigationItem> LocalRedirect { get; set; }
+        // Changed from IEnumerable<object> to ease further development.
+        public IEnumerable<NavigationItem> RedirectToItem { get; set; }
 
         // Dtto
         public IEnumerable<NavigationItem> ChildNavigationItems { get; set; }
 
         public IEnumerable<MultipleChoiceOption> AppearsIn { get; set; }
-        public string OtherRedirect { get; set; }
+        public string RedirectToUrl { get; set; }
         public string UrlSlug { get; set; }
         public string ViewName { get; set; }
         public ContentItemSystemAttributes System { get; set; }
@@ -34,8 +35,6 @@ namespace NavigationMenusMvc.Models
         public string UrlPath { get; set; }
         public string RedirectPath { get; set; }
         public NavigationItem Parent { get; set; }
-
-        // TODO Get rid of it?
         public IEnumerable<NavigationItem> AllParents { get; set; }
     }
 }

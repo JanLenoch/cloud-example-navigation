@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using NavigationMenusMvc.Helpers;
 
 namespace NavigationMenusMvc
 {
@@ -39,6 +40,8 @@ namespace NavigationMenusMvc
 
             // Register the IConfiguration instance which ProjectOptions binds against.
             services.Configure<ProjectOptions>(Configuration);
+            services.Configure<NavigationOptions>(Configuration);
+            services.Configure<ContentResolverOptions>(Configuration);
             services.AddMemoryCache();
             services.AddMvc();
 
@@ -47,6 +50,9 @@ namespace NavigationMenusMvc
                 CodeFirstModelProvider = { TypeProvider = new CustomTypeProvider() },
                 ContentLinkUrlResolver = new CustomContentLinkUrlResolver()
             });
+
+            services.AddSingleton<INavigationProvider>(c => new NavigationProvider(c.GetRequiredService<IOptions<NavigationOptions>>(), c.GetRequiredService<IDeliveryClient>(), c.GetRequiredService<IMemoryCache>()));
+            services.AddSingleton<IContentResolver>(c => new ContentResolver(c.GetRequiredService<IOptions<ContentResolverOptions>>(), c.GetRequiredService<INavigationProvider>()));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -89,9 +95,15 @@ namespace NavigationMenusMvc
                     template: "sitemap.xml");
 
                 routes.MapRoute(
-                    name: "kenticoCloudRouting",
+                    name: "facetedNavigation",
+                    template: "blog/{year?}/{month?}",
+                    defaults: new { controller = "Blog", action = "Index" });
+
+                routes.MapRoute(
+                    name: "staticContent",
                     template: "{*urlPath}",
-                    defaults: new { controller = "KenticoCloud", action = "ResolveContent" });
+                    defaults: new { controller = "StaticContent", action = "Index" },
+                    constraints: new { urlPath = new StaticContentConstraint(app.ApplicationServices.GetRequiredService<IContentResolver>()) });
 
                 routes.MapRoute(
                     name: "default",

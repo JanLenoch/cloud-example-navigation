@@ -1,10 +1,10 @@
-﻿using System.Threading.Tasks;
-using NavigationMenusMvc.Models;
+﻿using NavigationMenusMvc.Models;
+using System.Threading.Tasks;
 
 namespace NavigationMenusMvc.Helpers
 {
     public interface IContentResolver
     {
-        Task<ContentResolverResults> ResolveRelativeUrlPath(string urlPath);
+        Task<ContentResolverResults> ResolveRelativeUrlPath(string urlPath, string navigationCodeName = null, int? maxDepth = null);
     }
 }
