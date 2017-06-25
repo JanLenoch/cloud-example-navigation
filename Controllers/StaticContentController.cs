@@ -16,11 +16,13 @@ namespace NavigationMenusMvc.Controllers
 
         private readonly INavigationProvider _navigationProvider;
         private readonly IContentResolver _contentResolver;
+        private readonly IMenuItemGenerator _menuItemGenerator;
 
-        public StaticContentController(IDeliveryClient deliveryClient, IMemoryCache memoryCache, INavigationProvider navigationProvider, IContentResolver contentResolver) : base(deliveryClient, memoryCache)
+        public StaticContentController(IDeliveryClient deliveryClient, IMemoryCache memoryCache, INavigationProvider navigationProvider, IContentResolver contentResolver, IMenuItemGenerator menuItemGenerator) : base(deliveryClient, memoryCache)
         {
             _navigationProvider = navigationProvider ?? throw new ArgumentNullException(nameof(navigationProvider));
             _contentResolver = contentResolver ?? throw new ArgumentNullException(nameof(contentResolver));
+            _menuItemGenerator = menuItemGenerator ?? throw new ArgumentNullException(nameof(menuItemGenerator));
         }
 
         public async Task<ActionResult> Index(string urlPath)
@@ -64,7 +66,7 @@ namespace NavigationMenusMvc.Controllers
 
         private async Task<ViewResult> RenderViewAsync(IEnumerable<string> codenames, string viewName)
         {
-            var navigationTask = _navigationProvider.GetOrCreateCachedNavigationAsync();
+            var navigationTask = _menuItemGenerator.TryGenerateItems(await _navigationProvider.GetOrCreateCachedNavigationAsync());
 
             // Separate request for page body content. Separate caching, separate depth of modular content.
             var pageBodyTask = _deliveryClient.GetItemsAsync<object>(new InFilter("system.codename", codenames.ToArray()));

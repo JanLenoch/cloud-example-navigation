@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using KenticoCloud.Delivery;
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using KenticoCloud.Delivery;
 using Microsoft.AspNetCore.Html;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using System.IO;
 using System.Text.Encodings.Web;
 

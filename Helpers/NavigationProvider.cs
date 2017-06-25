@@ -57,10 +57,10 @@ namespace NavigationMenusMvc.Helpers
             {
                 throw new ArgumentNullException(nameof(options.Value.NavigationCacheExpirationMinutes));
             }
-            else if (options.Value.MaxDepth.Value < 2)
+            else if (options.Value.NavigationCacheExpirationMinutes.Value <= 0)
             {
                 // TODO Add constructor description.
-                throw new ArgumentOutOfRangeException(nameof(options.Value.NavigationCacheExpirationMinutes), $"The {nameof(options.Value.NavigationCacheExpirationMinutes)} parameter must be 2 or higher.");
+                throw new ArgumentOutOfRangeException(nameof(options.Value.NavigationCacheExpirationMinutes), $"The {nameof(options.Value.NavigationCacheExpirationMinutes)} parameter must be greater than zero.");
             }
 
             if (options.Value.RootToken == null)

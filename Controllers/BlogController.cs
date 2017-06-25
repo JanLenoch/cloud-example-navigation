@@ -15,10 +15,12 @@ namespace NavigationMenusMvc.Controllers
         private const string TYPE_NAME = "article";
         private const string ELEMENT_NAME = "elements.post_date";
         private readonly INavigationProvider _navigationProvider;
+        private readonly IMenuItemGenerator _menuItemGenerator;
 
-        public BlogController(IDeliveryClient deliveryClient, IMemoryCache memoryCache, INavigationProvider navigationProvider) : base(deliveryClient, memoryCache)
+        public BlogController(IDeliveryClient deliveryClient, IMemoryCache memoryCache, INavigationProvider navigationProvider, IMenuItemGenerator menuItemGenerator) : base(deliveryClient, memoryCache)
         {
             _navigationProvider = navigationProvider ?? throw new ArgumentNullException(nameof(navigationProvider));
+            _menuItemGenerator = menuItemGenerator ?? throw new ArgumentNullException(nameof(menuItemGenerator));
         }
 
         public async Task<ActionResult> Index(int? year, int? month)
@@ -42,7 +44,7 @@ namespace NavigationMenusMvc.Controllers
             }
 
             var pageBodyTask = _deliveryClient.GetItemsAsync<Article>(filters);
-            var navigationTask = _navigationProvider.GetOrCreateCachedNavigationAsync();
+            var navigationTask = _menuItemGenerator.TryGenerateItems(await _navigationProvider.GetOrCreateCachedNavigationAsync());
 
             await Task.WhenAll(pageBodyTask, navigationTask);
 

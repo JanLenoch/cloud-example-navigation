@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace NavigationMenusMvc.Models
 {
     // Removed 'partial'.
-    public class NavigationItem
+    public class NavigationItem : INavigationItem
     {
         public const string Codename = "navigation_item";
         public const string TitleCodename = "title";

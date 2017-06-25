@@ -53,6 +53,7 @@ namespace NavigationMenusMvc
 
             services.AddSingleton<INavigationProvider>(c => new NavigationProvider(c.GetRequiredService<IOptions<NavigationOptions>>(), c.GetRequiredService<IDeliveryClient>(), c.GetRequiredService<IMemoryCache>()));
             services.AddSingleton<IContentResolver>(c => new ContentResolver(c.GetRequiredService<IOptions<ContentResolverOptions>>(), c.GetRequiredService<INavigationProvider>()));
+            services.AddSingleton<IMenuItemGenerator>(c => new MenuItemGenerator(c.GetRequiredService<IOptions<NavigationOptions>>(), c.GetRequiredService<IDeliveryClient>(), c.GetRequiredService<IMemoryCache>()));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
