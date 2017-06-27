@@ -84,7 +84,7 @@ namespace NavigationMenusMvc.Helpers
                 {
                     if (i.PostDate.HasValue)
                     {
-                        yearsMonths.TryAdd(new Tuple<int, int>(i.PostDate.Value.Year, i.PostDate.Value.Month), $"{Enum.GetName(typeof(Months), i.PostDate.Value.Month - 1)} {i.PostDate.Value.Year}");
+                        yearsMonths.TryAdd(new Tuple<int, int>(i.PostDate.Value.Year, i.PostDate.Value.Month), $"{Enum.GetName(typeof(Months), i.PostDate.Value.Month)} {i.PostDate.Value.Year}");
                     }
                 });
 
