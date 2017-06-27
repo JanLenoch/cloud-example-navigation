@@ -1,36 +1,42 @@
-﻿using System;
+﻿using KenticoCloud.Delivery;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using NavigationMenusMvc.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using NavigationMenusMvc.Models;
-using KenticoCloud.Delivery;
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
 
 namespace NavigationMenusMvc.Helpers
 {
-    enum Months
-    {
-        January,
-        February,
-        March,
-        April,
-        May,
-        June,
-        July,
-        August,
-        September,
-        October,
-        November,
-        December
-    }
 
     public class MenuItemGenerator : IMenuItemGenerator
     {
+        #region "Fields"
+
         IDeliveryClient _client;
         IMemoryCache _cache;
         private readonly int _navigationCacheExpirationMinutes;
+
+        #endregion
+
+        #region "Properties"
+
+        public IDictionary<string, Func<INavigationItem, string, Task<INavigationItem>>> WellKnownUrls
+        {
+            get
+            {
+                return new Dictionary<string, Func<INavigationItem, string, Task<INavigationItem>>>()
+                {
+                    { "blog", GenerateBlogYearMonthItems }
+                };
+            }
+        }
+
+        #endregion
+
+        #region "Constructors"
 
         public MenuItemGenerator(IOptions<NavigationOptions> options, IDeliveryClient client, IMemoryCache cache)
         {
@@ -49,16 +55,9 @@ namespace NavigationMenusMvc.Helpers
             _navigationCacheExpirationMinutes = options.Value.NavigationCacheExpirationMinutes.Value;
         }
 
-        public IDictionary<string, Func<INavigationItem, string, Task<INavigationItem>>> WellKnownUrls
-        {
-            get
-            {
-                return new Dictionary<string, Func<INavigationItem, string, Task<INavigationItem>>>()
-                {
-                    { "blog", GenerateBlogYearMonthItems }
-                };
-            }
-        }
+        #endregion
+
+        #region "Public methods"
 
         public async Task<INavigationItem> TryGenerateItems(INavigationItem sourceItem)
         {
@@ -70,7 +69,11 @@ namespace NavigationMenusMvc.Helpers
             return sourceItem;
         }
 
-        public async Task<INavigationItem> GenerateBlogYearMonthItems(INavigationItem originalItem, string wellKnownUrl)
+        #endregion
+
+        #region "Private methods"
+
+        private async Task<INavigationItem> GenerateBlogYearMonthItems(INavigationItem originalItem, string wellKnownUrl)
         {
             return await _cache.GetOrCreate($"blogGeneratedMenuItems|{wellKnownUrl}", async entry =>
             {
@@ -183,5 +186,7 @@ namespace NavigationMenusMvc.Helpers
 
             return (month.HasValue) ? wellKnownUrl += $"/{month}" : wellKnownUrl;
         }
+
+        #endregion
     }
 }
