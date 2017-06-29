@@ -98,17 +98,19 @@ namespace NavigationMenusMvc.Helpers
             });
         }
 
-        private NavigationItem RegenerateItem(INavigationItem currentItem, ConcurrentDictionary<Tuple<int, int>, string> yearsMonths, List<INavigationItem> parentItems, string wellKnownUrl, bool flat)
+        private NavigationItem RegenerateItem(INavigationItem currentItem, ConcurrentDictionary<Tuple<int, int>, string> yearsMonths, List<INavigationItem> allParents, string wellKnownUrl, bool flat)
         {
-            parentItems = parentItems ?? new List<INavigationItem>();
+            allParents = allParents ?? new List<INavigationItem>();
             var newItem = new NavigationItem();
 
-            if (!parentItems.Contains(currentItem))
+            if (!allParents.Contains(currentItem))
             {
                 newItem.AppearsIn = currentItem.AppearsIn;
                 newItem.Title = currentItem.Title;
                 newItem.UrlPath = currentItem.UrlPath;
-                parentItems.Add(currentItem);
+                newItem.AllParents = allParents.Cast<NavigationItem>();
+                var nextAllParents = new List<INavigationItem>(allParents);
+                nextAllParents.Add(currentItem);
 
                 if (currentItem.UrlPath.Equals(wellKnownUrl, StringComparison.OrdinalIgnoreCase))
                 {
@@ -141,7 +143,7 @@ namespace NavigationMenusMvc.Helpers
                 }
                 else
                 {
-                    newItem.ChildNavigationItems = currentItem.ChildNavigationItems.Select(i => RegenerateItem(i, yearsMonths, parentItems, wellKnownUrl, flat)).ToList();
+                    newItem.ChildNavigationItems = currentItem.ChildNavigationItems.Select(i => RegenerateItem(i, yearsMonths, nextAllParents, wellKnownUrl, flat)).ToList();
                 }
 
                 return newItem;

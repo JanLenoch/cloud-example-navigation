@@ -192,7 +192,7 @@ namespace NavigationMenusMvc.Helpers
                     {
                         Found = true,
 
-                        // Allowing client code to decide the final shape of URL, hence no leading slash character.
+                        // Allowing client code to decide the final shape of URL, thus no leading slash character.
                         RedirectUrl = $"{currentItem.UrlPath}"
                     };
                 }
@@ -231,7 +231,7 @@ namespace NavigationMenusMvc.Helpers
             }
             else
             {
-                // Dtto.
+                // Uninitialized, hence Found = false.
                 return new ContentResolverResults();
             }
         }

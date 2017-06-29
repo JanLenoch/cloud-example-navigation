@@ -23,31 +23,39 @@ namespace NavigationMenusMvc.Controllers
         public async Task<ActionResult> Index()
         {
             var navigation = await _navigationProvider.GetOrCreateCachedNavigationAsync();
-            var flatNavigation = NavigationProvider.GetNavigationItemsFlat(navigation).ToList();
-            Dictionary<NavigationItem, List<string>> codenames = new Dictionary<NavigationItem, List<string>>();
 
-            foreach (var item in flatNavigation)
+            if (navigation != null)
             {
-                codenames.Add(item, ContentResolver.GetContentItemCodenames(item.ContentItems).ToList());
-            }
+                var flatNavigation = NavigationProvider.GetNavigationItemsFlat(navigation).ToList();
+                Dictionary<NavigationItem, List<string>> codenames = new Dictionary<NavigationItem, List<string>>();
 
-            var response = await _deliveryClient.GetItemsAsync(new InFilter("system.codename", codenames.SelectMany(ni => ni.Value).ToArray()));
-            var nodes = new List<SitemapNode>();
-
-            foreach (var item in codenames)
-            {
-                var lastModifiedContentItem = response.Items.Where(ci => item.Value.Contains(ci.System.Codename)).OrderByDescending(ci => ci.System.LastModified).FirstOrDefault();
-
-                if (lastModifiedContentItem != null)
+                foreach (var item in flatNavigation)
                 {
-                    nodes.Add(new SitemapNode(item.Key.UrlPath)
-                    {
-                        LastModificationDate = lastModifiedContentItem.System.LastModified
-                    }); 
+                    codenames.Add(item, ContentResolver.GetContentItemCodenames(item.ContentItems).ToList());
                 }
-            }
 
-            return new SitemapProvider().CreateSitemap(new SitemapModel(nodes));
+                var response = await _deliveryClient.GetItemsAsync(new InFilter("system.codename", codenames.SelectMany(ni => ni.Value).ToArray()));
+                var nodes = new List<SitemapNode>();
+
+                foreach (var item in codenames)
+                {
+                    var lastModifiedContentItem = response.Items.Where(ci => item.Value.Contains(ci.System.Codename)).OrderByDescending(ci => ci.System.LastModified).FirstOrDefault();
+
+                    if (lastModifiedContentItem != null)
+                    {
+                        nodes.Add(new SitemapNode(item.Key.UrlPath)
+                        {
+                            LastModificationDate = lastModifiedContentItem.System.LastModified
+                        });
+                    }
+                }
+
+                return new SitemapProvider().CreateSitemap(new SitemapModel(nodes)); 
+            }
+            else
+            {
+                return NotFound();
+            }
         }
     }
 }
