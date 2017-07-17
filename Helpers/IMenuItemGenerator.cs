@@ -8,7 +8,7 @@ namespace NavigationMenusMvc.Helpers
 {
     public interface IMenuItemGenerator
     {
-        IDictionary<string, Func<INavigationItem, string, Task<INavigationItem>>> WellKnownUrls { get; }
-        Task<INavigationItem> TryGenerateItems(INavigationItem item);
+        IDictionary<string, Func<NavigationItem, string, Task<NavigationItem>>> StartingUrls { get; }
+        Task<NavigationItem> GenerateItemsAsync(NavigationItem item);
     }
 }

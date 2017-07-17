@@ -23,13 +23,13 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Properties"
 
-        public IDictionary<string, Func<INavigationItem, string, Task<INavigationItem>>> WellKnownUrls
+        public IDictionary<string, Func<NavigationItem, string, Task<NavigationItem>>> StartingUrls
         {
             get
             {
-                return new Dictionary<string, Func<INavigationItem, string, Task<INavigationItem>>>()
+                return new Dictionary<string, Func<NavigationItem, string, Task<NavigationItem>>>()
                 {
-                    { "blog", GenerateBlogYearMonthItems }
+                    { "blog", GenerateNavigationWithBlogItemsAsync }
                 };
             }
         }
@@ -59,80 +59,116 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Public methods"
 
-        public async Task<INavigationItem> TryGenerateItems(INavigationItem sourceItem)
+        /// <summary>
+        /// Wraps all methods that generate additional navigation items.
+        /// </summary>
+        /// <param name="sourceItem">The original root navigation item</param>
+        /// <returns>A copy of the <paramref name="sourceItem"/> with additional items</returns>
+        public async Task<NavigationItem> GenerateItemsAsync(NavigationItem sourceItem)
         {
-            foreach (var url in WellKnownUrls.Keys)
+            return await _cache.GetOrCreateAsync("generatedNavigationItems", async entry =>
             {
-                sourceItem = await WellKnownUrls[url].Invoke(sourceItem, WellKnownUrls.Keys.FirstOrDefault(k => k.Equals(url, StringComparison.OrdinalIgnoreCase)));
-            }
+                foreach (var url in StartingUrls.Keys)
+                {
+                    sourceItem = await StartingUrls[url].Invoke(sourceItem, StartingUrls.Keys.FirstOrDefault(k => k.Equals(url, StringComparison.OrdinalIgnoreCase)));
+                }
 
-            return sourceItem;
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_navigationCacheExpirationMinutes);
+
+                return sourceItem;
+            });
         }
 
         #endregion
 
         #region "Private methods"
 
-        private async Task<INavigationItem> GenerateBlogYearMonthItems(INavigationItem originalItem, string wellKnownUrl)
+        /// <summary>
+        /// Generates a copy of the original <see cref="NavigationItem"/> hierarchy, with added child navigation items under the "/blog" starting item. Generates year and month items, based on "Post date" elements of existing "Article" content items.
+        /// </summary>
+        /// <param name="originalItem">The original hierarchy</param>
+        /// <param name="startingUrl">The starting item URL</param>
+        /// <returns>The new hierarchy with Blog child items</returns>
+        private async Task<NavigationItem> GenerateNavigationWithBlogItemsAsync(NavigationItem originalItem, string startingUrl)
         {
-            return await _cache.GetOrCreate($"blogGeneratedMenuItems|{wellKnownUrl}", async entry =>
+            var response = await _client.GetItemsAsync<Article>(new EqualsFilter("system.type", "article"), new ElementsParameter(new string[] { "post_date" }));
+
+            // The key holds the pair of year and month digits, the value is supposed to hold a friendly name like "October 2014".
+            var yearsMonths = new Dictionary<YearMonthPair, string>();
+
+            foreach (var item in response.Items)
             {
-                var response = await _client.GetItemsAsync<Article>(new EqualsFilter("system.type", "article"), new ElementsParameter(new string[] { "post_date" }));
-                var yearsMonths = new ConcurrentDictionary<Tuple<int, int>, string>();
-
-                Parallel.ForEach(response.Items.ToList(), i =>
+                if (item.PostDate.HasValue)
                 {
-                    if (i.PostDate.HasValue)
+                    try
                     {
-                        yearsMonths.TryAdd(new Tuple<int, int>(i.PostDate.Value.Year, i.PostDate.Value.Month), $"{Enum.GetName(typeof(Months), i.PostDate.Value.Month)} {i.PostDate.Value.Year}");
+                        yearsMonths.Add(new YearMonthPair(item.PostDate.Value.Year, item.PostDate.Value.Month), $"{Enum.GetName(typeof(Months), item.PostDate.Value.Month)} {item.PostDate.Value.Year}");
                     }
-                });
+                    catch
+                    {
+                        // Do nothing. Just omit an article falling into the same date range.
+                    }
+                }
+            }
 
-                // Start a recursion for ChildNavigationItems.
-                // If Drawer menu were able to render deeply nested menus, I could change the flat: true to false.
-                var regeneratedItems = RegenerateItem(originalItem, yearsMonths, new List<INavigationItem>(), wellKnownUrl, flat: true);
+            // If Drawer menu were able to render deeply nested menus, I could change the "flat" to false.
+            var regeneratedItems = ProcessLevelForBlog(originalItem, yearsMonths, startingUrl, flat: true, processedParents: new List<NavigationItem>());
 
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_navigationCacheExpirationMinutes);
-
-                return regeneratedItems;
-            });
+            return regeneratedItems;
         }
 
-        private NavigationItem RegenerateItem(INavigationItem currentItem, ConcurrentDictionary<Tuple<int, int>, string> yearsMonths, List<INavigationItem> allParents, string wellKnownUrl, bool flat)
+        /// <summary>
+        /// Traverses the original hierarchy, creates a lightweight clone of it (not all original properties), and adds <see cref="NavigationItem"/> items for the Blog section.
+        /// </summary>
+        /// <param name="currentItem">The root <see cref="NavigationItem"/></param>
+        /// <param name="yearsMonths">Dictionary of years and months of existing "Article" content items</param>
+        /// <param name="startingUrl">The starting URL where new year and month <see cref="NavigationItem"/> items will be added</param>
+        /// <param name="flat">Flag indicating whether flat structure like "October 2014" should be generated</param>
+        /// <param name="processedParents">Collection of processed parent navigation items</param>
+        /// <returns>A copy of <paramref name="currentItem"/> with generated Blog navigation items</returns>
+        private NavigationItem ProcessLevelForBlog(NavigationItem currentItem, IDictionary<YearMonthPair, string> yearsMonths, string startingUrl, bool flat, IList<NavigationItem> processedParents)
         {
-            allParents = allParents ?? new List<INavigationItem>();
+            processedParents = processedParents ?? new List<NavigationItem>();
             var newItem = new NavigationItem();
 
-            if (!allParents.Contains(currentItem))
+            // Check for infinite loops.
+            if (!processedParents.Contains(currentItem))
             {
-                newItem.AppearsIn = currentItem.AppearsIn;
+                // Add only those properties that are needed to render the menu (as opposed to routing the incoming requests).
                 newItem.Title = currentItem.Title;
                 newItem.UrlPath = currentItem.UrlPath;
-                newItem.AllParents = allParents.Cast<NavigationItem>();
-                var nextAllParents = new List<INavigationItem>(allParents);
-                nextAllParents.Add(currentItem);
+                newItem.AllParents = processedParents;
+                processedParents.Add(currentItem);
 
-                if (currentItem.UrlPath.Equals(wellKnownUrl, StringComparison.OrdinalIgnoreCase))
+                // The "/blog" item is currently being iterated over.
+                if (currentItem.UrlPath.Equals(startingUrl, StringComparison.OrdinalIgnoreCase))
                 {
+                    // Example of a flat variant: "October 2014", "November 2014" etc.
                     if (flat)
                     {
                         var items = new List<NavigationItem>();
-                        items.AddRange(yearsMonths.OrderBy(k => k.Key, new YearMonthComparer()).Select(i => GenerateYearMonthItem(i.Key.Item1, i.Key.Item2, i.Value, wellKnownUrl, currentItem.AppearsIn)));
+                        items.AddRange(yearsMonths.OrderBy(k => k.Key, new YearMonthComparer()).Select(i => GetItem(startingUrl, i.Value, i.Key.Year, i.Key.Month)));
                         newItem.ChildNavigationItems = items.ToList();
                     }
+                    // Example of a deep variant:
+                    // "2014"
+                    //    "10"
+                    //    "11"
                     else
                     {
                         var yearItems = new List<NavigationItem>();
 
+                        // Distill years of existing "Article" items.
                         foreach (var year in yearsMonths.Distinct(new YearEqualityComparer()))
                         {
-                            var yearItem = GenerateYearItem(year.Key.Item1, wellKnownUrl, currentItem.AppearsIn);
+                            var yearItem = GetItem(startingUrl, null, year.Key.Year);
                             yearItems.Add(yearItem);
                             var monthItems = new List<NavigationItem>();
 
-                            foreach (var month in yearsMonths.Keys.Where(k => k.Item1 == year.Key.Item1).OrderBy(k => k.Item2))
+                            // Distill months.
+                            foreach (var month in yearsMonths.Keys.Where(k => k.Year == year.Key.Year).OrderBy(k => k.Month))
                             {
-                                monthItems.Add(GenerateMonthItem(year.Key.Item1, month.Item2, wellKnownUrl, currentItem.AppearsIn));
+                                monthItems.Add(GetItem(startingUrl, null, year.Key.Year, month.Month));
                             }
 
                             yearItem.ChildNavigationItems = monthItems;
@@ -143,7 +179,7 @@ namespace NavigationMenusMvc.Helpers
                 }
                 else
                 {
-                    newItem.ChildNavigationItems = currentItem.ChildNavigationItems.Select(i => RegenerateItem(i, yearsMonths, nextAllParents, wellKnownUrl, flat)).ToList();
+                    newItem.ChildNavigationItems = currentItem.ChildNavigationItems.Select(i => ProcessLevelForBlog(i, yearsMonths, startingUrl, flat, processedParents)).ToList();
                 }
 
                 return newItem;
@@ -152,41 +188,42 @@ namespace NavigationMenusMvc.Helpers
             return null;
         }
 
-        private static NavigationItem GenerateYearMonthItem(int year, int month, string title, string wellKnownUrl, IEnumerable<MultipleChoiceOption> appearsIn)
+        private static NavigationItem GetItem(string startingUrl, string title, int year, int? month = null)
         {
+            string urlPath;
+
+            if (!month.HasValue)
+            {
+                title = year.ToString();
+                urlPath = ConcatenateUrl(startingUrl, year, null);
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(title))
+                {
+                    title = Enum.GetName(typeof(Months), month.Value);
+                }
+
+                urlPath = ConcatenateUrl(startingUrl, year, month.Value);
+            }
+
             return new NavigationItem
             {
-                AppearsIn = appearsIn,
                 Title = title,
-                UrlPath = ConcatenateUrl(wellKnownUrl, year, month)
+                UrlPath = urlPath
             };
         }
 
-        private static NavigationItem GenerateYearItem(int year, string wellKnownUrl, IEnumerable<MultipleChoiceOption> appearsIn)
+        private static string ConcatenateUrl(string startingUrl, int year, int? month)
         {
-            return new NavigationItem
+            if (startingUrl == null)
             {
-                AppearsIn = appearsIn,
-                Title = year.ToString(),
-                UrlPath = ConcatenateUrl(wellKnownUrl, year, null)
-            };
-        }
+                throw new ArgumentNullException(nameof(startingUrl));
+            }
 
-        private static NavigationItem GenerateMonthItem(int year, int month, string wellKnownUrl, IEnumerable<MultipleChoiceOption> appearsIn)
-        {
-            return new NavigationItem
-            {
-                AppearsIn = appearsIn,
-                Title = Enum.GetName(typeof(Months), month),
-                UrlPath = ConcatenateUrl(wellKnownUrl, year, month)
-            };
-        }
+            startingUrl += (startingUrl.EndsWith("/") ? year.ToString() : $"/{year}");
 
-        private static string ConcatenateUrl(string wellKnownUrl, int year, int? month)
-        {
-            wellKnownUrl += (wellKnownUrl.EndsWith("/") ? year.ToString() : $"/{year}");
-
-            return (month.HasValue) ? wellKnownUrl += $"/{month}" : wellKnownUrl;
+            return (month.HasValue) ? startingUrl + $"/{month}" : startingUrl;
         }
 
         #endregion

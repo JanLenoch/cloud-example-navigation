@@ -1,29 +1,20 @@
-﻿using System;
+﻿using NavigationMenusMvc.Models;
+using System;
 using System.Collections.Generic;
 
 namespace NavigationMenusMvc.Helpers
 {
-    class YearMonthComparer : IComparer<Tuple<int, int>>
+    class YearMonthComparer : IComparer<YearMonthPair>
     {
-        public int Compare(Tuple<int, int> x, Tuple<int, int> y)
+        public int Compare(YearMonthPair x, YearMonthPair y)
         {
-            if (x == null)
+            if (x.Year == y.Year)
             {
-                throw new ArgumentNullException();
-            }
-
-            if (y == null)
-            {
-                throw new ArgumentNullException();
-            }
-
-            if (x.Item1 == y.Item1)
-            {
-                return x.Item2.CompareTo(y.Item2);
+                return x.Month.CompareTo(y.Month);
             }
             else
             {
-                return x.Item1.CompareTo(y.Item1);
+                return x.Year.CompareTo(y.Year);
             }
         }
     }

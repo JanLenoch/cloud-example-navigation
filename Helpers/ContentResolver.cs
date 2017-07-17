@@ -12,7 +12,7 @@ namespace NavigationMenusMvc.Helpers
     public class ContentResolver : IContentResolver
     {
         #region "Fields"
-        
+
         private readonly INavigationProvider _navigationProvider;
         private readonly string _navigationCodename;
         private readonly int _maxDepth;
@@ -20,7 +20,7 @@ namespace NavigationMenusMvc.Helpers
         private readonly string _homepageToken;
 
         #endregion
-        
+
         #region "Constructors"
 
         public ContentResolver(IOptions<ContentResolverOptions> options, INavigationProvider navigationProvider)
@@ -79,19 +79,19 @@ namespace NavigationMenusMvc.Helpers
         /// </summary>
         /// <param name="urlPath">The relative URL from the HTTP request</param>
         /// <returns>The <see cref="ContentResolverResults"/>. If Found is true and the RedirectUrl isn't empty, then it means a local redirect to a static content URL.</returns>
-        public async Task<ContentResolverResults> ResolveRelativeUrlPath(string urlPath, string navigationCodeName = null, int? maxDepth = null)
+        public async Task<IContentResolverResults> ResolveRelativeUrlPathAsync(string urlPath, string navigationCodeName = null, int? maxDepth = null)
         {
             string cn = navigationCodeName ?? _navigationCodename;
-            int d = maxDepth.HasValue ? maxDepth.Value : _maxDepth;
+            int d = maxDepth ?? _maxDepth;
 
-            // Get the 'Navigation' item with depth=deepest menu in the app.
+            // Get the 'Navigation' item, ideally with "depth" set to the actual depth of the menu.
             var navigationItem = await _navigationProvider.GetOrCreateCachedNavigationAsync(cn, d);
 
             // Strip the trailing slash and split.
             string[] urlSlugs = NavigationProvider.GetUrlSlugs(urlPath);
 
             // Recursively iterate over modular content and match the URL slugs for the each recursion level.
-            return await ProcessUrlLevelAsync(urlSlugs, navigationItem, _rootLevel, navigationItem.ViewName);
+            return await ProcessUrlLevelAsync(urlSlugs, navigationItem, _rootLevel);
         }
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Private methods"
 
-        private async Task<ContentResolverResults> ProcessUrlLevelAsync(string[] urlSlugs, NavigationItem currentLevelItem, int currentLevel, string viewName)
+        private async Task<IContentResolverResults> ProcessUrlLevelAsync(string[] urlSlugs, NavigationItem currentLevelItem, int currentLevel)
         {
             if (urlSlugs == null)
             {
@@ -146,27 +146,21 @@ namespace NavigationMenusMvc.Helpers
             // No need to replace with ROOT_TOKEN, we're checking the incoming URL.
             string currentSlug = urlSlugs[currentLevel] == string.Empty ? _homepageToken : urlSlugs[currentLevel];
 
-            NavigationItem matchingChild = currentLevelItem.ChildNavigationItems.FirstOrDefault(i => i.UrlSlug == currentSlug);
+            NavigationItem matchingChild = (NavigationItem)currentLevelItem.ChildNavigationItems.FirstOrDefault(i => i.UrlSlug == currentSlug);
             bool endOfPath = currentLevel == urlSlugs.Count() - 1;
 
             if (matchingChild != null)
             {
-                // Set a new inherited view name for lower nodes in the hierarchy.
-                if (!string.IsNullOrEmpty(matchingChild.ViewName))
-                {
-                    viewName = matchingChild.ViewName;
-                }
-
                 if (endOfPath)
                 {
-                    return await ResolveContentAsync(matchingChild, matchingChild, viewName, false);
+                    return await ResolveContentAsync(matchingChild, matchingChild, false);
                 }
                 else
                 {
                     int newLevel = currentLevel + 1;
 
                     // Dig through the incoming URL.
-                    return await ProcessUrlLevelAsync(urlSlugs, matchingChild, newLevel, viewName);
+                    return await ProcessUrlLevelAsync(urlSlugs, matchingChild, newLevel);
                 }
             }
             else
@@ -176,14 +170,29 @@ namespace NavigationMenusMvc.Helpers
             }
         }
 
-        private async Task<ContentResolverResults> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, string viewName, bool redirected)
+        private async Task<IContentResolverResults> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, bool redirected)
         {
             if (currentItem == null)
             {
                 throw new ArgumentNullException(nameof(currentItem));
             }
 
-            if (currentItem.ContentItems != null && currentItem.ContentItems.Any())
+            if (currentItem.RedirectToItem != null && currentItem.RedirectToItem.Any())
+            {
+                var redirectItem = currentItem.RedirectToItem.FirstOrDefault();
+
+                // Check for infinite loops.
+                if (!redirectItem.Equals(originalItem))
+                {
+                    return await ResolveContentAsync(originalItem, redirectItem, true);
+                }
+                else
+                {
+                    // A non-invasive solution of endless loops - not found. Uninitialized, hence Found = false.
+                    return new ContentResolverResults();
+                }
+            }
+            else if (currentItem.ContentItem != null && currentItem.ContentItem.Any())
             {
                 if (redirected)
                 {
@@ -192,7 +201,7 @@ namespace NavigationMenusMvc.Helpers
                     {
                         Found = true,
 
-                        // Allowing client code to decide the final shape of URL, thus no leading slash character.
+                        // Allowing the client code to decide the final shape of URL, thus no leading slash character.
                         RedirectUrl = $"{currentItem.UrlPath}"
                     };
                 }
@@ -201,24 +210,8 @@ namespace NavigationMenusMvc.Helpers
                     return new ContentResolverResults
                     {
                         Found = true,
-                        ContentItemCodenames = GetContentItemCodenames(currentItem.ContentItems),
-                        ViewName = viewName
+                        ContentItemCodenames = GetContentItemCodenames(currentItem.ContentItem),
                     };
-                }
-            }
-            else if (currentItem.RedirectToItem != null && currentItem.RedirectToItem.Any())
-            {
-                var redirectItem = currentItem.RedirectToItem.FirstOrDefault();
-
-                // Check for infinite loops.
-                if (!redirectItem.Equals(originalItem))
-                {
-                    return await ResolveContentAsync(originalItem, redirectItem, viewName, true);
-                }
-                else
-                {
-                    // Non-invasive solution. Uninitialized, hence Found = false.
-                    return new ContentResolverResults();
                 }
             }
             else if (!string.IsNullOrEmpty(currentItem.RedirectToUrl))

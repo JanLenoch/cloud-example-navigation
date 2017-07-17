@@ -33,6 +33,8 @@ namespace NavigationMenusMvc.Models
                     return typeof(NavigationItem);
                 case "office":
                     return typeof(Office);
+                case "content_listing":
+                    return typeof(ContentListing);
                 default:
                     return null;
             }

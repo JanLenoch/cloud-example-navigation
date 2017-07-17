@@ -31,7 +31,7 @@ namespace NavigationMenusMvc.Controllers
 
             try
             {
-                results = await _contentResolver.ResolveRelativeUrlPath(urlPath);
+                results = await _contentResolver.ResolveRelativeUrlPathAsync(urlPath);
             }
             catch (Exception ex)
             {
@@ -66,17 +66,15 @@ namespace NavigationMenusMvc.Controllers
 
         private async Task<ViewResult> RenderViewAsync(IEnumerable<string> codenames, string viewName)
         {
-            var navigationTask = _menuItemGenerator.TryGenerateItems(await _navigationProvider.GetOrCreateCachedNavigationAsync());
+            var navigation = await _menuItemGenerator.GenerateItemsAsync(await _navigationProvider.GetOrCreateCachedNavigationAsync());
 
             // Separate request for page body content. Separate caching, separate depth of modular content.
-            var pageBodyTask = _deliveryClient.GetItemsAsync<object>(new InFilter("system.codename", codenames.ToArray()));
-
-            await Task.WhenAll(navigationTask, pageBodyTask);
+            var pageBody = await _deliveryClient.GetItemsAsync<object>(new InFilter("system.codename", codenames.ToArray()));
 
             var pageViewModel = new PageViewModel
             {
-                Navigation = navigationTask.Result,
-                Body = pageBodyTask.Result.Items
+                Navigation = navigation,
+                Body = pageBody.Items
             };
 
             return View((string.IsNullOrEmpty(viewName) ? DEFAULT_VIEW : viewName), pageViewModel);

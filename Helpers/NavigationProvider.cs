@@ -103,7 +103,7 @@ namespace NavigationMenusMvc.Helpers
         public async Task<NavigationItem> GetNavigationItemsAsync(string navigationCodeName = null, int? maxDepth = null)
         {
             string cn = navigationCodeName ?? _navigationCodename;
-            int d = maxDepth.HasValue ? maxDepth.Value : _maxDepth;
+            int d = maxDepth ?? _maxDepth;
 
             var response = await _client.GetItemsAsync<NavigationItem>(
                 new EqualsFilter("system.type", ITEM_TYPE),
@@ -124,35 +124,25 @@ namespace NavigationMenusMvc.Helpers
         public async Task<NavigationItem> GetOrCreateCachedNavigationAsync(string navigationCodeName = null, int? maxDepth = null)
         {
             string cn = navigationCodeName ?? _navigationCodename;
-            int d = maxDepth.HasValue ? maxDepth.Value : _maxDepth;
+            int d = maxDepth ?? _maxDepth;
 
             return await _cache.GetOrCreate(NAVIGATION_CACHE_KEY, async entry =>
             {
                 var navigation = await GetNavigationItemsAsync(cn, d);
+                var emptyList = new List<NavigationItem>();
 
-                // Add UrlPath property values first.
-                AddUrlPaths(new List<NavigationItem>(), navigation, string.Empty);
+                // Add the UrlPath property values to the navigation items first.
+                AddUrlPaths((IList<NavigationItem>)emptyList, navigation, string.Empty);
 
-                // UrlPath needed, hence a separate iteration.
-                DecorateItems(navigation, null, new List<NavigationItem>(), navigation);
+                emptyList.Clear();
+
+                // Then, add the RedirectPath, Parent, and AllParents property values. UrlPath value is needed for that, hence a separate iteration through the hierarchy.
+                AddRedirectPathsAndParents(navigation, (IList<NavigationItem>)emptyList, navigation);
 
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_navigationCacheExpirationMinutes);
 
                 return navigation;
             });
-        }
-
-        /// <summary>
-        /// Flattens the hierarchical <see cref="NavigationItem"/> item and its children to a flat collection.
-        /// </summary>
-        /// <param name="navigation">The hierarchical <see cref="NavigationItem"/></param>
-        /// <returns>The flattened collection</returns>
-        public static IEnumerable<NavigationItem> GetNavigationItemsFlat(NavigationItem navigation)
-        {
-            var outputList = new List<NavigationItem>();
-            FlattenLevelToList(new List<NavigationItem>(), navigation, outputList);
-
-            return outputList;
         }
 
         /// <summary>
@@ -169,42 +159,11 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Private methods"
 
-        private static void FlattenLevelToList(List<NavigationItem> allParents, NavigationItem currentItem, List<NavigationItem> outputList)
+        private void AddUrlPaths(IList<NavigationItem> processedParents, NavigationItem currentItem, string pathStub)
         {
-            if (allParents == null)
+            if (processedParents == null)
             {
-                throw new ArgumentNullException(nameof(allParents));
-            }
-
-            if (currentItem == null)
-            {
-                throw new ArgumentNullException(nameof(currentItem));
-            }
-
-            if (outputList == null)
-            {
-                throw new ArgumentNullException(nameof(outputList));
-            }
-
-            outputList = outputList ?? new List<NavigationItem>();
-            outputList.AddRange(currentItem.ChildNavigationItems);
-
-            // Check for infinite loops.
-            if (!allParents.Contains(currentItem))
-            {
-                var nextAllParents = new List<NavigationItem>(allParents);
-                nextAllParents.Add(currentItem);
-
-                // Spawn a tree of recursions running in parallel.
-                Parallel.ForEach(currentItem.ChildNavigationItems, currentChild => FlattenLevelToList(nextAllParents, currentChild, outputList));
-            }
-        }
-
-        private void AddUrlPaths(List<NavigationItem> allParents, NavigationItem currentItem, string pathStub)
-        {
-            if (allParents == null)
-            {
-                throw new ArgumentNullException(nameof(allParents));
+                throw new ArgumentNullException(nameof(processedParents));
             }
 
             if (currentItem == null)
@@ -213,62 +172,66 @@ namespace NavigationMenusMvc.Helpers
             }
 
             // Check for infinite loops.
-            if (!allParents.Contains(currentItem))
+            if (!processedParents.Contains(currentItem))
             {
                 AddUrlPath(currentItem, pathStub);
-                var nextAllParents = new List<NavigationItem>(allParents);
-                nextAllParents.Add(currentItem);
+                processedParents.Add(currentItem);
 
-                // Spawn a tree of recursions running in parallel.
-                Parallel.ForEach(currentItem.ChildNavigationItems, currentChild => AddUrlPaths(nextAllParents, currentChild, currentItem.UrlPath));
+                // Spawn a tree of recursions.
+                foreach (var currentChild in currentItem.ChildNavigationItems)
+                {
+                    AddUrlPaths(processedParents, currentChild, currentItem.UrlPath);
+                }
             }
         }
 
-        private void DecorateItems(NavigationItem cachedNavigation, NavigationItem parentItem, List<NavigationItem> allParents, NavigationItem currentItem)
+        private void AddRedirectPathsAndParents(NavigationItem cachedNavigation, IList<NavigationItem> processedParents, NavigationItem currentItem)
         {
             if (currentItem == null)
             {
                 throw new ArgumentNullException(nameof(currentItem));
             }
-
+            
             // Check for infinite loops.
-            if (!allParents.Contains(currentItem))
+            if (!processedParents.Contains(currentItem))
             {
                 var redirect = currentItem.RedirectToItem.FirstOrDefault();
 
                 if (redirect != null)
                 {
-                    currentItem.RedirectPath = AddRedirectPath(cachedNavigation, redirect);
+                    currentItem.RedirectPath = GetRedirectPath(cachedNavigation, redirect);
                 }
 
-                currentItem.Parent = parentItem;
-                currentItem.AllParents = allParents;
-                var nextAllParents = new List<NavigationItem>(allParents);
-                nextAllParents.Add(currentItem);
-                
-                // Spawn a tree of recursions running in parallel.
-                Parallel.ForEach(currentItem.ChildNavigationItems, currentChild => DecorateItems(cachedNavigation, currentItem, nextAllParents, currentChild));
+                currentItem.Parent = processedParents.Count > 0 ? processedParents.Last() : null;
+                currentItem.AllParents = processedParents;
+                processedParents.Add(currentItem);
+
+                // Spawn a tree of recursions.
+                foreach (var currentChild in currentItem.ChildNavigationItems)
+                {
+                    AddRedirectPathsAndParents(cachedNavigation, processedParents, currentChild);
+                }
             }
         }
 
-        private void AddUrlPath(NavigationItem cachedNavigation, string pathStub)
+        private void AddUrlPath(NavigationItem navigationItem, string pathStub)
         {
-            if (cachedNavigation == null)
+            if (navigationItem == null)
             {
-                throw new ArgumentNullException(nameof(cachedNavigation));
+                throw new ArgumentNullException(nameof(navigationItem));
             }
 
-            if (cachedNavigation.UrlSlug != _rootToken && cachedNavigation.UrlSlug != _homepageToken)
+            if (navigationItem.UrlSlug != _rootToken && navigationItem.UrlSlug != _homepageToken)
             {
-                cachedNavigation.UrlPath = !string.IsNullOrEmpty(pathStub) ? $"{pathStub}/{cachedNavigation.UrlSlug}" : cachedNavigation.UrlSlug;
+                navigationItem.UrlPath = !string.IsNullOrEmpty(pathStub) ? $"{pathStub}/{navigationItem.UrlSlug}" : navigationItem.UrlSlug;
             }
             else
             {
-                cachedNavigation.UrlPath = string.Empty;
+                navigationItem.UrlPath = string.Empty;
             }
         }
 
-        private string AddRedirectPath(NavigationItem cachedNavigation, NavigationItem itemToLocate)
+        private string GetRedirectPath(NavigationItem cachedNavigation, NavigationItem itemToLocate)
         {
             if (cachedNavigation == null)
             {
@@ -293,15 +256,7 @@ namespace NavigationMenusMvc.Helpers
             }
             else
             {
-                var results = new List<string>();
-
-                foreach (var childItem in cachedNavigation.ChildNavigationItems)
-                {
-                    results.Add(AddRedirectPath(childItem, itemToLocate));
-                }
-
-                // No heuristics here, just the first occurrence.
-                return results.FirstOrDefault(r => !string.IsNullOrEmpty(r));
+                return cachedNavigation.ChildNavigationItems.Select(i => GetRedirectPath(i, itemToLocate)).FirstOrDefault(r => !string.IsNullOrEmpty(r));
             }
         }
 

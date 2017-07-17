@@ -91,11 +91,6 @@ namespace NavigationMenusMvc
             app.UseMvc(routes =>
             {
                 routes.MapRoute(
-                    name: "sitemap",
-                    defaults: new { controller = "Sitemap", action = "Index" },
-                    template: "sitemap.xml");
-
-                routes.MapRoute(
                     name: "facetedNavigation",
                     template: "blog/{year?}/{month?}",
                     defaults: new { controller = "Blog", action = "Index" });

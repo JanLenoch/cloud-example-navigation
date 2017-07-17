@@ -5,6 +5,6 @@ namespace NavigationMenusMvc.Helpers
 {
     public interface IContentResolver
     {
-        Task<ContentResolverResults> ResolveRelativeUrlPath(string urlPath, string navigationCodeName = null, int? maxDepth = null);
+        Task<IContentResolverResults> ResolveRelativeUrlPathAsync(string urlPath, string navigationCodeName = null, int? maxDepth = null);
     }
 }

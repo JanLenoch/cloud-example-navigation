@@ -40,18 +40,23 @@ namespace NavigationMenusMvc.Controllers
             }
             else if (year.HasValue && month.HasValue)
             {
-                filters.Add(new RangeFilter(ELEMENT_NAME, $"{year}-{GetMonthFormatted(month.Value)}", $"{year}-{GetMonthFormatted(month.Value + 1)}"));
+                if (month < 12)
+                {
+                    filters.Add(new RangeFilter(ELEMENT_NAME, $"{year}-{GetMonthFormatted(month.Value)}", $"{year}-{GetMonthFormatted(month.Value + 1)}"));
+                }
+                else
+                {
+                    filters.Add(new RangeFilter(ELEMENT_NAME, $"{year}-12", $"{year + 1}-01"));
+                }
             }
 
-            var pageBodyTask = _deliveryClient.GetItemsAsync<Article>(filters);
-            var navigationTask = _menuItemGenerator.TryGenerateItems(await _navigationProvider.GetOrCreateCachedNavigationAsync());
-
-            await Task.WhenAll(pageBodyTask, navigationTask);
+            var pageBody = await _deliveryClient.GetItemsAsync<Article>(filters);
+            var navigation = await _menuItemGenerator.GenerateItemsAsync(await _navigationProvider.GetOrCreateCachedNavigationAsync());
 
             var pageViewModel = new PageViewModel
             {
-                Navigation = navigationTask.Result,
-                Body = pageBodyTask.Result.Items
+                Navigation = navigation,
+                Body = pageBody.Items
             };
 
             return View(DEFAULT_VIEW, pageViewModel);
@@ -59,7 +64,7 @@ namespace NavigationMenusMvc.Controllers
 
         private string GetMonthFormatted(int month)
         {
-            return (month < 10) ? "0" + month.ToString() : month.ToString();
+            return (month < 10) ? $"0{month}" : $"{month}";
         }
     }
 }

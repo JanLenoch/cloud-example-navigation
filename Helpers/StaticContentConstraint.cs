@@ -41,7 +41,7 @@ namespace NavigationMenusMvc.Helpers
             {
                 var parameterValueString = Convert.ToString(routeValue, CultureInfo.InvariantCulture);
 
-                IContentResolverResults results = _resolver.ResolveRelativeUrlPath(parameterValueString).Result;
+                IContentResolverResults results = _resolver.ResolveRelativeUrlPathAsync(parameterValueString).Result;
 
                 return (results != null && results.Found);
             }

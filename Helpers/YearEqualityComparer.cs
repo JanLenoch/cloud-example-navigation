@@ -1,18 +1,19 @@
-﻿using System;
+﻿using NavigationMenusMvc.Models;
+using System;
 using System.Collections.Generic;
 
 namespace NavigationMenusMvc.Helpers
 {
-    class YearEqualityComparer : IEqualityComparer<KeyValuePair<Tuple<int, int>, string>>
+    class YearEqualityComparer : IEqualityComparer<KeyValuePair<YearMonthPair, string>>
     {
-        public bool Equals(KeyValuePair<Tuple<int, int>, string> x, KeyValuePair<Tuple<int, int>, string> y)
+        public bool Equals(KeyValuePair<YearMonthPair, string> x, KeyValuePair<YearMonthPair, string> y)
         {
-            return x.Key.Item1 == y.Key.Item1;
+            return x.Key.Year == y.Key.Year;
         }
 
-        public int GetHashCode(KeyValuePair<Tuple<int, int>, string> obj)
+        public int GetHashCode(KeyValuePair<YearMonthPair, string> obj)
         {
-            return obj.Key.Item1.GetHashCode();
+            return obj.Key.Year.GetHashCode();
         }
     }
 }
