@@ -1,12 +1,11 @@
-﻿using KenticoCloud.Delivery;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
-using NavigationMenusMvc.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
+using KenticoCloud.Delivery;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using NavigationMenusMvc.Models;
 
 namespace NavigationMenusMvc.Helpers
 {
@@ -27,7 +26,7 @@ namespace NavigationMenusMvc.Helpers
         {
             get
             {
-                return new Dictionary<string, Func<NavigationItem, string, Task<NavigationItem>>>()
+                return new Dictionary<string, Func<NavigationItem, string, Task<NavigationItem>>>
                 {
                     { "blog", GenerateNavigationWithBlogItemsAsync }
                 };
@@ -91,7 +90,7 @@ namespace NavigationMenusMvc.Helpers
         /// <returns>The new hierarchy with Blog child items</returns>
         private async Task<NavigationItem> GenerateNavigationWithBlogItemsAsync(NavigationItem originalItem, string startingUrl)
         {
-            var response = await _client.GetItemsAsync<Article>(new EqualsFilter("system.type", "article"), new ElementsParameter(new string[] { "post_date" }));
+            var response = await _client.GetItemsAsync<Article>(new EqualsFilter("system.type", "article"), new ElementsParameter("post_date"));
 
             // The key holds the pair of year and month digits, the value is supposed to hold a friendly name like "October 2014".
             var yearsMonths = new Dictionary<YearMonthPair, string>();

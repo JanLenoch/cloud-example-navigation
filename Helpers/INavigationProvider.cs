@@ -1,5 +1,5 @@
-﻿using NavigationMenusMvc.Models;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using NavigationMenusMvc.Models;
 
 namespace NavigationMenusMvc.Helpers
 {

@@ -1,11 +1,11 @@
-﻿using KenticoCloud.Delivery;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Options;
-using NavigationMenusMvc.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using KenticoCloud.Delivery;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using NavigationMenusMvc.Models;
 
 namespace NavigationMenusMvc.Helpers
 {
@@ -128,12 +128,12 @@ namespace NavigationMenusMvc.Helpers
                 var emptyList = new List<NavigationItem>();
 
                 // Add the UrlPath property values to the navigation items first.
-                AddUrlPaths((IList<NavigationItem>)emptyList, navigation, string.Empty);
+                AddUrlPaths(emptyList, navigation, string.Empty);
 
                 emptyList.Clear();
 
                 // Then, add the RedirectPath, Parent, and AllParents property values. UrlPath value is needed for that, hence a separate iteration through the hierarchy.
-                AddRedirectPathsAndParents(navigation, (IList<NavigationItem>)emptyList, navigation);
+                AddRedirectPathsAndParents(navigation, emptyList, navigation);
 
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_navigationCacheExpirationMinutes);
 
@@ -148,7 +148,7 @@ namespace NavigationMenusMvc.Helpers
         /// <returns>The array of URL slugs</returns>
         public static string[] GetUrlSlugs(string urlPath)
         {
-            return urlPath != null ? urlPath.TrimEnd("/".ToCharArray()).Split("/".ToCharArray()) : new string[] { string.Empty };
+            return urlPath != null ? urlPath.TrimEnd("/".ToCharArray()).Split("/".ToCharArray()) : new[] { string.Empty };
         }
 
         #endregion

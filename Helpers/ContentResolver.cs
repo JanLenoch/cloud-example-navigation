@@ -1,11 +1,11 @@
-﻿using KenticoCloud.Delivery;
-using Microsoft.Extensions.Options;
-using NavigationMenusMvc.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using KenticoCloud.Delivery;
+using Microsoft.Extensions.Options;
+using NavigationMenusMvc.Models;
 
 namespace NavigationMenusMvc.Helpers
 {
@@ -142,7 +142,7 @@ namespace NavigationMenusMvc.Helpers
             // No need to replace with ROOT_TOKEN, we're checking the incoming URL.
             string currentSlug = urlSlugs[currentLevel] == string.Empty ? _homepageToken : urlSlugs[currentLevel];
 
-            NavigationItem matchingChild = (NavigationItem)currentLevelItem.ChildNavigationItems.FirstOrDefault(i => i.UrlSlug == currentSlug);
+            NavigationItem matchingChild = currentLevelItem.ChildNavigationItems.FirstOrDefault(i => i.UrlSlug == currentSlug);
             bool endOfPath = currentLevel == urlSlugs.Count() - 1;
 
             if (matchingChild != null)
@@ -206,7 +206,7 @@ namespace NavigationMenusMvc.Helpers
                     return new ContentResolverResults
                     {
                         Found = true,
-                        ContentItemCodenames = GetContentItemCodenames(currentItem.ContentItem),
+                        ContentItemCodenames = GetContentItemCodenames(currentItem.ContentItem)
                     };
                 }
             }
