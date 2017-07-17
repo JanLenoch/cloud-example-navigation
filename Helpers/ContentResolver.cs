@@ -58,10 +58,6 @@ namespace NavigationMenusMvc.Helpers
             {
                 throw new ArgumentNullException(nameof(options.Value.HomepageToken));
             }
-            else if (options.Value.HomepageToken.Equals(string.Empty))
-            {
-                throw new ArgumentOutOfRangeException(nameof(options.Value.HomepageToken), $"The '{nameof(options.Value.HomepageToken)}' parameter must not be an empty string.");
-            }
 
             _navigationProvider = navigationProvider ?? throw new ArgumentNullException(nameof(navigationProvider));
             _navigationCodename = options.Value.NavigationCodename;

@@ -72,13 +72,9 @@ namespace NavigationMenusMvc.Helpers
                 throw new ArgumentOutOfRangeException(nameof(options.Value.RootToken), $"The {nameof(options.Value.RootToken)} parameter must not be an empty string.");
             }
 
-            if (string.IsNullOrEmpty(options.Value.HomepageToken))
+            if (options.Value.HomepageToken == null)
             {
                 throw new ArgumentNullException(nameof(options.Value.HomepageToken));
-            }
-            else if (options.Value.HomepageToken.Equals(string.Empty))
-            {
-                throw new ArgumentOutOfRangeException(nameof(options.Value.HomepageToken), $"The {nameof(options.Value.HomepageToken)} parameter must not be an empty string.");
             }
 
             _client = client ?? throw new ArgumentNullException(nameof(client));
