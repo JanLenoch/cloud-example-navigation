@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using KenticoCloud.Delivery;
@@ -17,26 +18,18 @@ namespace NavigationMenusMvc.Helpers
         IDeliveryClient _client;
         IMemoryCache _cache;
         private readonly int _navigationCacheExpirationMinutes;
-
-        #endregion
-
-        #region "Properties"
-
-        public IDictionary<string, Func<NavigationItem, string, Task<NavigationItem>>> StartingUrls
-        {
-            get
-            {
-                return new Dictionary<string, Func<NavigationItem, string, Task<NavigationItem>>>
-                {
-                    { "blog", GenerateNavigationWithBlogItemsAsync }
-                };
-            }
-        }
+        private Dictionary<string, Func<NavigationItem, string, Task<NavigationItem>>> _startingUrls = new Dictionary<string, Func<NavigationItem, string, Task<NavigationItem>>>();
 
         #endregion
 
         #region "Constructors"
 
+        /// <summary>
+        /// Constructs a new <see cref="MenuItemGenerator"/>.
+        /// </summary>
+        /// <param name="options">Environment settings</param>
+        /// <param name="client">A client to communicate with the Delivery/Preview API</param>
+        /// <param name="cache">The in-memory cache. The NavigationCacheExpirationMinutes value must be a positive number.</param>
         public MenuItemGenerator(IOptions<NavigationOptions> options, IDeliveryClient client, IMemoryCache cache)
         {
             if (!options.Value.NavigationCacheExpirationMinutes.HasValue)
@@ -45,13 +38,13 @@ namespace NavigationMenusMvc.Helpers
             }
             else if (options.Value.NavigationCacheExpirationMinutes.Value <= 0)
             {
-                // TODO Add constructor description.
                 throw new ArgumentOutOfRangeException(nameof(options.Value.NavigationCacheExpirationMinutes), $"The {nameof(options.Value.NavigationCacheExpirationMinutes)} parameter must be greater than zero.");
             }
 
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _cache = cache ?? throw new ArgumentNullException(nameof(cache));
             _navigationCacheExpirationMinutes = options.Value.NavigationCacheExpirationMinutes.Value;
+            _startingUrls.Add("blog", GenerateNavigationWithBlogItemsAsync);
         }
 
         #endregion
@@ -67,9 +60,9 @@ namespace NavigationMenusMvc.Helpers
         {
             return await _cache.GetOrCreateAsync("generatedNavigationItems", async entry =>
             {
-                foreach (var url in StartingUrls.Keys)
+                foreach (var url in _startingUrls)
                 {
-                    sourceItem = await StartingUrls[url].Invoke(sourceItem, StartingUrls.Keys.FirstOrDefault(k => k.Equals(url, StringComparison.OrdinalIgnoreCase)));
+                    sourceItem = await url.Value(sourceItem, url.Key);
                 }
 
                 entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(_navigationCacheExpirationMinutes);
@@ -101,7 +94,7 @@ namespace NavigationMenusMvc.Helpers
                 {
                     try
                     {
-                        yearsMonths.Add(new YearMonthPair(item.PostDate.Value.Year, item.PostDate.Value.Month), $"{Enum.GetName(typeof(Months), item.PostDate.Value.Month)} {item.PostDate.Value.Year}");
+                        yearsMonths.Add(new YearMonthPair(item.PostDate.Value.Year, item.PostDate.Value.Month), $"{CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(item.PostDate.Value.Month)} {item.PostDate.Value.Year}");
                     }
                     catch
                     {
@@ -200,7 +193,7 @@ namespace NavigationMenusMvc.Helpers
             {
                 if (string.IsNullOrEmpty(title))
                 {
-                    title = Enum.GetName(typeof(Months), month.Value);
+                    title = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month.Value);
                 }
 
                 urlPath = ConcatenateUrl(startingUrl, year, month.Value);

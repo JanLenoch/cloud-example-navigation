@@ -32,6 +32,12 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Constructors"
 
+        /// <summary>
+        /// Constructs a new <see cref="NavigationProvider"/>.
+        /// </summary>
+        /// <param name="options">Environment settings. The NavigationCodename, HomepageToken and RootToken must be set; the MaxDepth must be 2 or greater.</param>
+        /// <param name="client">A client to communicate with the Delivery/Preview API</param>
+        /// <param name="cache">The in-memory cache. The NavigationCacheExpirationMinutes value must be a positive number.</param>
         public NavigationProvider(IOptions<NavigationOptions> options, IDeliveryClient client, IMemoryCache cache)
         {
             if (options.Value.NavigationCodename == null)
@@ -49,7 +55,6 @@ namespace NavigationMenusMvc.Helpers
             }
             else if (options.Value.MaxDepth.Value < 2)
             {
-                // TODO Add constructor description.
                 throw new ArgumentOutOfRangeException(nameof(options.Value.MaxDepth), $"The {nameof(options.Value.MaxDepth)} parameter must be 2 or higher.");
             }
 
@@ -59,7 +64,6 @@ namespace NavigationMenusMvc.Helpers
             }
             else if (options.Value.NavigationCacheExpirationMinutes.Value <= 0)
             {
-                // TODO Add constructor description.
                 throw new ArgumentOutOfRangeException(nameof(options.Value.NavigationCacheExpirationMinutes), $"The {nameof(options.Value.NavigationCacheExpirationMinutes)} parameter must be greater than zero.");
             }
 
@@ -91,40 +95,19 @@ namespace NavigationMenusMvc.Helpers
         #region "Public methods"
 
         /// <summary>
-        /// Requests the root <see cref="NavigationItem"/> item off of the Delivery/Preview API endpoint.
-        /// </summary>
-        /// <param name="navigationCodeName">The explicit codename of the root item. If <see langword="null" />, the value supplied in the constructor is taken.</param>
-        /// <param name="maxDepth">The explicit maximum depth of the hierarchy to be fetched</param>
-        /// <returns>The root item of either the explicit codename, or default codename</returns>
-        public async Task<NavigationItem> GetNavigationItemsAsync(string navigationCodeName = null, int? maxDepth = null)
-        {
-            string cn = navigationCodeName ?? _navigationCodename;
-            int d = maxDepth ?? _maxDepth;
-
-            var response = await _client.GetItemsAsync<NavigationItem>(
-                new EqualsFilter("system.type", ITEM_TYPE),
-                new EqualsFilter("system.codename", cn),
-                new LimitParameter(1),
-                new DepthParameter(d)
-            );
-
-            return response.Items.FirstOrDefault();
-        }
-
-        /// <summary>
         /// Gets the root <see cref="NavigationItem"/> item either off of the <see cref="IMemoryCache"/> or the Delivery/Preview API endpoint.
         /// </summary>
         /// <param name="navigationCodeName">The explicit codename of the root item. If <see langword="null" />, the value supplied in the constructor is taken.</param>
         /// <param name="maxDepth">The explicit maximum depth of the hierarchy to be fetched</param>
         /// <returns>The root item of either the explicit codename, or default codename</returns>
-        public async Task<NavigationItem> GetOrCreateCachedNavigationAsync(string navigationCodeName = null, int? maxDepth = null)
+        public async Task<NavigationItem> GetNavigationAsync(string navigationCodeName = null, int? maxDepth = null)
         {
             string cn = navigationCodeName ?? _navigationCodename;
             int d = maxDepth ?? _maxDepth;
 
             return await _cache.GetOrCreate(NAVIGATION_CACHE_KEY, async entry =>
             {
-                var navigation = await GetNavigationItemsAsync(cn, d);
+                var navigation = await LoadNavigationItemsAsync(cn, d);
                 var emptyList = new List<NavigationItem>();
 
                 // Add the UrlPath property values to the navigation items first.
@@ -154,6 +137,21 @@ namespace NavigationMenusMvc.Helpers
         #endregion
 
         #region "Private methods"
+
+        public async Task<NavigationItem> LoadNavigationItemsAsync(string navigationCodeName = null, int? maxDepth = null)
+        {
+            string cn = navigationCodeName ?? _navigationCodename;
+            int d = maxDepth ?? _maxDepth;
+
+            var response = await _client.GetItemsAsync<NavigationItem>(
+                new EqualsFilter("system.type", ITEM_TYPE),
+                new EqualsFilter("system.codename", cn),
+                new LimitParameter(1),
+                new DepthParameter(d)
+            );
+
+            return response.Items.FirstOrDefault();
+        }
 
         private void AddUrlPaths(IList<NavigationItem> processedParents, NavigationItem currentItem, string pathStub)
         {

@@ -23,6 +23,11 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Constructors"
 
+        /// <summary>
+        /// Constructs a new <see cref="ContentResolver"/>.
+        /// </summary>
+        /// <param name="options">Environment settings. The NavigationCodename and HomepageToken must be set; the MaxDepth must be 2 or greater; the RootLevel must not be negative.</param>
+        /// <param name="navigationProvider">The navigation provider</param>
         public ContentResolver(IOptions<ContentResolverOptions> options, INavigationProvider navigationProvider)
         {
             if (options.Value.NavigationCodename == null)
@@ -40,7 +45,6 @@ namespace NavigationMenusMvc.Helpers
             }
             else if (options.Value.MaxDepth.Value < 2)
             {
-                // TODO Add constructor description.
                 throw new ArgumentOutOfRangeException(nameof(options.Value.MaxDepth), $"The {nameof(options.Value.MaxDepth)} parameter must be 2 or higher.");
             }
 
@@ -50,7 +54,6 @@ namespace NavigationMenusMvc.Helpers
             }
             else if (options.Value.RootLevel.Value < 0)
             {
-                // TODO Add constructor description.
                 throw new ArgumentOutOfRangeException(nameof(options.Value.RootLevel), $"The {nameof(options.Value.RootLevel)} parameter must be 0 or higher.");
             }
 
@@ -75,13 +78,13 @@ namespace NavigationMenusMvc.Helpers
         /// </summary>
         /// <param name="urlPath">The relative URL from the HTTP request</param>
         /// <returns>The <see cref="ContentResolverResults"/>. If Found is true and the RedirectUrl isn't empty, then it means a local redirect to a static content URL.</returns>
-        public async Task<IContentResolverResults> ResolveRelativeUrlPathAsync(string urlPath, string navigationCodeName = null, int? maxDepth = null)
+        public async Task<ContentResolverResults> ResolveRelativeUrlPathAsync(string urlPath, string navigationCodeName = null, int? maxDepth = null)
         {
             string cn = navigationCodeName ?? _navigationCodename;
             int d = maxDepth ?? _maxDepth;
 
             // Get the 'Navigation' item, ideally with "depth" set to the actual depth of the menu.
-            var navigationItem = await _navigationProvider.GetOrCreateCachedNavigationAsync(cn, d);
+            var navigationItem = await _navigationProvider.GetNavigationAsync(cn, d);
 
             // Strip the trailing slash and split.
             string[] urlSlugs = NavigationProvider.GetUrlSlugs(urlPath);
@@ -117,7 +120,7 @@ namespace NavigationMenusMvc.Helpers
 
         #region "Private methods"
 
-        private async Task<IContentResolverResults> ProcessUrlLevelAsync(string[] urlSlugs, NavigationItem currentLevelItem, int currentLevel)
+        private async Task<ContentResolverResults> ProcessUrlLevelAsync(string[] urlSlugs, NavigationItem currentLevelItem, int currentLevel)
         {
             if (urlSlugs == null)
             {
@@ -166,7 +169,7 @@ namespace NavigationMenusMvc.Helpers
             }
         }
 
-        private async Task<IContentResolverResults> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, bool redirected)
+        private async Task<ContentResolverResults> ResolveContentAsync(NavigationItem originalItem, NavigationItem currentItem, bool redirected)
         {
             if (currentItem == null)
             {

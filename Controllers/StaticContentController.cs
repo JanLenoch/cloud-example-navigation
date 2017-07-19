@@ -27,7 +27,7 @@ namespace NavigationMenusMvc.Controllers
 
         public async Task<ActionResult> Index(string urlPath)
         {
-            IContentResolverResults results;
+            ContentResolverResults results;
 
             try
             {
@@ -66,7 +66,7 @@ namespace NavigationMenusMvc.Controllers
 
         private async Task<ViewResult> RenderViewAsync(IEnumerable<string> codenames, string viewName)
         {
-            var navigation = await _menuItemGenerator.GenerateItemsAsync(await _navigationProvider.GetOrCreateCachedNavigationAsync());
+            var navigation = await _menuItemGenerator.GenerateItemsAsync(await _navigationProvider.GetNavigationAsync());
 
             // Separate request for page body content. Separate caching, separate depth of modular content.
             var pageBody = await _deliveryClient.GetItemsAsync<object>(new InFilter("system.codename", codenames.ToArray()));

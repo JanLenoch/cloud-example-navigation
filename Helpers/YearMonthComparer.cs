@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using NavigationMenusMvc.Models;
 
 namespace NavigationMenusMvc.Helpers
@@ -13,7 +14,7 @@ namespace NavigationMenusMvc.Helpers
             }
             else
             {
-                return x.Year.CompareTo(y.Year);
+                return 0;
             }
         }
     }

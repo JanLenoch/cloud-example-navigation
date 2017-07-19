@@ -2,7 +2,7 @@
 
 namespace NavigationMenusMvc.Models
 {
-    public struct ContentResolverResults : IContentResolverResults
+    public class ContentResolverResults
     {
         public bool Found { get; set; }
         public IEnumerable<string> ContentItemCodenames { get; set; }
