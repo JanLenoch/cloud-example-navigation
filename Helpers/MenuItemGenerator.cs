@@ -130,7 +130,11 @@ namespace NavigationMenusMvc.Helpers
                 newItem.Title = currentItem.Title;
                 newItem.UrlPath = currentItem.UrlPath;
                 newItem.AllParents = processedParents;
-                processedParents.Add(currentItem);
+
+                // Prepare the collection of all parents for the next chunk of child items.
+                var nextProcessedParents = new List<NavigationItem>(processedParents);
+
+                nextProcessedParents.Add(currentItem);
 
                 // The "/blog" item is currently being iterated over.
                 if (currentItem.UrlPath.Equals(startingUrl, StringComparison.OrdinalIgnoreCase))
@@ -171,7 +175,7 @@ namespace NavigationMenusMvc.Helpers
                 }
                 else
                 {
-                    newItem.ChildNavigationItems = currentItem.ChildNavigationItems.Select(i => ProcessLevelForBlog(i, yearsMonths, startingUrl, flat, processedParents)).ToList();
+                    newItem.ChildNavigationItems = currentItem.ChildNavigationItems.Select(i => ProcessLevelForBlog(i, yearsMonths, startingUrl, flat, nextProcessedParents)).ToList();
                 }
 
                 return newItem;

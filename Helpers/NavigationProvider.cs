@@ -198,12 +198,16 @@ namespace NavigationMenusMvc.Helpers
 
                 currentItem.Parent = processedParents.Count > 0 ? processedParents.Last() : null;
                 currentItem.AllParents = processedParents;
-                processedParents.Add(currentItem);
+
+                // Prepare the collection of all parents for the next chunk of child items.
+                var nextProcessedParents = new List<NavigationItem>(processedParents);
+
+                nextProcessedParents.Add(currentItem);
 
                 // Spawn a tree of recursions.
                 foreach (var currentChild in currentItem.ChildNavigationItems)
                 {
-                    AddRedirectPathsAndParents(cachedNavigation, processedParents, currentChild);
+                    AddRedirectPathsAndParents(cachedNavigation, nextProcessedParents, currentChild);
                 }
             }
         }
