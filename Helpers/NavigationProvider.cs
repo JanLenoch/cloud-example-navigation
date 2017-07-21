@@ -196,7 +196,7 @@ namespace NavigationMenusMvc.Helpers
                     currentItem.RedirectPath = GetRedirectPath(cachedNavigation, redirect);
                 }
 
-                currentItem.Parent = processedParents.Count > 0 ? processedParents.Last() : null;
+                currentItem.Parent = processedParents.Any() ? processedParents.Last() : null;
                 currentItem.AllParents = processedParents;
 
                 // Prepare the collection of all parents for the next chunk of child items.
